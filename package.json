@@ -1,0 +1,21 @@
+{
+  "name": "ghidra-tooling",
+  "version": "0.0.1",
+  "description": "ghidra-tooling for http://github.com/blizzhackers/Charon",
+  "main": "bin/index.js",
+  "types": "bin/index.d.ts",
+  "scripts": {
+    "script": "yarn && node -r ts-node/register ./gameHeaderConverter.ts"
+  },
+  "files": [
+    "/bin"
+  ],
+  "keywords": [],
+  "author": "Jaenster",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^13.7.4",
+    "ts-node": "^8.6.2",
+    "typescript": "^3.8.2"
+  }
+}

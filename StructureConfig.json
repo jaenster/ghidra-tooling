@@ -1,0 +1,17 @@
+{
+  "structs": [
+    "D2UnitStrc",
+    "D2CharSelStrc",
+    "D2QServerStrc",
+    "D2IniConfigStrc",
+    "FORMS_PredefinedFormStrc"
+  ],
+  "enums": [
+    "eD2LevelId",
+    "eD2GSGameType",
+    "eD2GSConnectionType",
+    "eD2ClientAppMode"
+  ],
+  "ghidraFile": "c:\\users\\jaenster\\game.exe.h",
+  "charonDirectory": "c:\\code\\cpp\\Charon\\"
+}
