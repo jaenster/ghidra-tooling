@@ -103,12 +103,22 @@ class CPPClass {
 }
 
 let changed, configChanged;
-const Config = {
+const Config: {
+    structs: string[],
+    enums: string[],
+    charonDirectory: string,
+    ghidraFile: string,
+    compressFile: boolean,
+    overrideTypes: {[data: string]: {
+            [fieldName: string]: string,
+    }}
+} = {
     structs: [],
     enums: [],
     charonDirectory: '',
     ghidraFile: '',
     compressFile: true,
+    overrideTypes: {},
 };
 
 const warningString = '\r\n\r\n\r\n\r\n\r\n\r\n\r\n/*\r\nThis file is generated, do not edit by hand. \r\nConsult readme.md\r\n*/\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n';
@@ -300,6 +310,21 @@ fs.watchFile(Config.ghidraFile, changed = () => {
         wantedType.set(el, type);
     });
 
+    // Allow the user to override ghidra types to abstracter classes, like change D2UnitStrc to D2PlayerStrc
+    wantedType.forEach(struct => {
+       if (!Struct.isSelfType(struct)) return;
+
+        struct.fields.forEach((field,index) => {
+            if (Config.overrideTypes.hasOwnProperty(struct.name)) {
+                const [, currentName] = field;
+                const current = Config.overrideTypes[struct.name];
+                if (current && current.hasOwnProperty(currentName)) {
+                    struct.fields[index][0] = current[currentName];
+                }
+            }
+        })
+    })
+
 
     // compress the file
     Config.compressFile && wantedType.forEach(struct => {
@@ -331,7 +356,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
                         // too small set
                         acc.push(...running.items.splice(0, running.items.length));
                     } else {
-                        acc.push([running.type, '_' + (running.counter++) + '[' + running.items.length + ']', '// removed field_0xxx for space'])
+                        acc.push([running.type, '_' + (running.counter++) + '[' + running.items.length + ']', '// compressed'])
                         running.items.splice(0, running.items.length);
                     }
                 }

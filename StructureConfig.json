@@ -13,6 +13,11 @@
     "eD2GSConnectionType",
     "eD2ClientAppMode"
   ],
+  "overrideTypes": {
+    "D2ClientStrc": {
+      "pPlayer": "D2UnitPlayer*"
+    }
+  },
   "ghidraFile": "c:\\users\\jaenster\\game.exe.h",
   "charonDirectory": "c:\\code\\cpp\\Charon\\",
   "compressFile": true
