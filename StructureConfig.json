@@ -4,7 +4,8 @@
     "D2CharSelStrc",
     "D2QServerStrc",
     "D2IniConfigStrc",
-    "FORMS_PredefinedFormStrc"
+    "FORMS_PredefinedFormStrc",
+    "D2BoundingBoxStrc"
   ],
   "enums": [
     "eD2LevelId",

@@ -209,6 +209,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
                         if (tmp[tmp.length - 1].endsWith('*')) tmp[tmp.length - 1] = tmp[tmp.length - 1].substr(0, -1);
                         preComment = tmp.join(' ').trim();
                     }
+
                     currentStruct.preComment = preComment;
                     while (lines[lines.length - 1] !== '};') {
                         let fieldType, fieldName;
@@ -248,6 +249,13 @@ fs.watchFile(Config.ghidraFile, changed = () => {
                             let tmp = line.split(' ').filter(el => !['enum', 'struct', 'union'].includes(el));
                             fieldName = tmp.pop();
                             fieldType = tmp.join(' ');
+                        }
+
+                        // remove variadic ghidra struct size
+                        if (fieldType.includes('[0]')) {
+                            fieldType = fieldType.substr(0,fieldType.indexOf('[')).trim();
+                            fieldName += '[1]';
+                            comments = 'variable size*/';
                         }
 
                         // external type
