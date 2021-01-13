@@ -109,9 +109,11 @@ const Config: {
     charonDirectory: string,
     ghidraFile: string,
     compressFile: boolean,
-    overrideTypes: {[data: string]: {
+    overrideTypes: {
+        [data: string]: {
             [fieldName: string]: string,
-    }}
+        }
+    }
 } = {
     structs: [],
     enums: [],
@@ -241,7 +243,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
                                 typedef.type = ` ${returnType} (*${typedefName})(${args})`;
 
                                 args.split(',').forEach(arg => {
-                                    let [type, name] = arg.trim().split(' ');
+                                    let [type] = arg.trim().split(' ');
                                     type = type.replace('*', '');
                                     typedef.depends.add(type);
                                 })
@@ -263,7 +265,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
 
                         // remove variadic ghidra struct size
                         if (fieldType.includes('[0]')) {
-                            fieldType = fieldType.substr(0,fieldType.indexOf('[')).trim();
+                            fieldType = fieldType.substr(0, fieldType.indexOf('[')).trim();
                             fieldName += '[1]';
                             comments = 'variable size*/';
                         }
@@ -312,9 +314,9 @@ fs.watchFile(Config.ghidraFile, changed = () => {
 
     // Allow the user to override ghidra types to abstracter classes, like change D2UnitStrc to D2PlayerStrc
     wantedType.forEach(struct => {
-       if (!Struct.isSelfType(struct)) return;
+        if (!Struct.isSelfType(struct)) return;
 
-        struct.fields.forEach((field,index) => {
+        struct.fields.forEach((field, index) => {
             if (Config.overrideTypes.hasOwnProperty(struct.name)) {
                 const [, currentName] = field;
                 const current = Config.overrideTypes[struct.name];
@@ -337,29 +339,33 @@ fs.watchFile(Config.ghidraFile, changed = () => {
             counter: 0,
             items: [],
         }
-        struct.fields = struct.fields.reduce((acc, cur,index, orgin) => {
+        struct.fields = struct.fields.reduce((acc, cur, index, orgin) => {
             let [type, name] = cur;
 
-            const isLast = orgin.length-1 === index;
+            const writeCurrent = () => {
+                if (!running.items.length) return
+
+                if (running.items.length < 2) {
+                    // too small set
+                    acc.push(...running.items.splice(0, running.items.length));
+                } else {
+                    acc.push([running.type, '_' + (running.counter++) + '[' + running.items.length + ']', '// compressed'])
+                    running.items.splice(0, running.items.length);
+                }
+
+            }
+            const isLast = orgin.length - 1 === index;
             const startsWith = name.startsWith('field_');
 
             if (startsWith) {
                 // If not running, we are now
+                if (running.type !== type) writeCurrent();
                 if (!running.items.length) running.type = type;
-
-                if (running.type == type) running.items.push(cur);
-
+                running.items.push(cur);
             }
+
             if (!startsWith || isLast) {
-                if (running.items.length !== 0) {
-                    if (running.items.length < 2) {
-                        // too small set
-                        acc.push(...running.items.splice(0, running.items.length));
-                    } else {
-                        acc.push([running.type, '_' + (running.counter++) + '[' + running.items.length + ']', '// compressed'])
-                        running.items.splice(0, running.items.length);
-                    }
-                }
+                writeCurrent();
             }
 
             if (!startsWith) {
@@ -395,7 +401,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
             while (lines.length) {
                 let currentLine = lines.pop();
 
-                const isNamespace = /\s*?namespace\s*(\w*?)\s*\{/gm.exec(currentLine);
+                const isNamespace = /\s*?namespace\s*(\w*?)\s*{/gm.exec(currentLine);
                 if (isNamespace) [, currentNamespace] = isNamespace;
 
                 const isMethod = currentNamespace !== 'Ghidra' ?
@@ -427,7 +433,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
             while (lines.length) {
                 let currentLine = lines.pop();
 
-                const isNamespace = /\s*?namespace\s*(\w*?)\s*\{/gm.exec(currentLine);
+                const isNamespace = /\s*?namespace\s*(\w*?)\s*{/gm.exec(currentLine);
                 if (isNamespace) [, currentNamespace] = isNamespace;
 
                 const isStruct = currentNamespace !== 'Ghidra' ?
