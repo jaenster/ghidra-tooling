@@ -304,7 +304,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
     // compress the file
     Config.compressFile && wantedType.forEach(struct => {
         if (!(struct instanceof Struct)) return;
-        if (struct.fields.length < 10) return;
+        // if (struct.fields.length < 10) return;
 
         const running = {
             type: '',
@@ -312,19 +312,22 @@ fs.watchFile(Config.ghidraFile, changed = () => {
             counter: 0,
             items: [],
         }
-        struct.fields = struct.fields.reduce((acc, cur) => {
+        struct.fields = struct.fields.reduce((acc, cur,index, orgin) => {
             let [type, name] = cur;
 
+            const isLast = orgin.length-1 === index;
+            const startsWith = name.startsWith('field_');
 
-            if (name.startsWith('field_')) {
+            if (startsWith) {
                 // If not running, we are now
                 if (!running.items.length) running.type = type;
 
                 if (running.type == type) running.items.push(cur);
-            } else {
 
+            }
+            if (!startsWith || isLast) {
                 if (running.items.length !== 0) {
-                    if (running.items.length < 3) {
+                    if (running.items.length < 2) {
                         // too small set
                         acc.push(...running.items.splice(0, running.items.length));
                     } else {
@@ -332,8 +335,10 @@ fs.watchFile(Config.ghidraFile, changed = () => {
                         running.items.splice(0, running.items.length);
                     }
                 }
-                // just normal line
-                acc.push(cur);
+            }
+
+            if (!startsWith) {
+                acc.push(cur);// just normal line
             }
 
             return acc;
@@ -383,7 +388,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
             }
         } catch (e) {
             // If file not present we simply dont load the files
-            console.warn(e.message, e.stack);
+            console.warn(e.stack);
         }
     }
 
@@ -421,7 +426,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
             }
         } catch (e) {
             // If file not present we simply dont load the files
-            console.warn(e.message);
+            console.warn(e.stack);
         }
 
 
