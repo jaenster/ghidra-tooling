@@ -66,13 +66,15 @@ class Typedef extends Type {
 }
 
 class Union extends Type {
+    preComment: string;
     fields: [string, string, string][] = [];
     depends: Set<string> = new Set();
 
-    static readonly instances: Struct[] = [];
+    static readonly instances: Union[] = [];
 }
 
 class Struct extends Type {
+    preComment: string;
     fields: [string, string, string][] = [];
     depends: Set<string> = new Set();
 
@@ -89,12 +91,24 @@ class Method {
     }
 }
 
+class CPPClass {
+    public readonly structVariant
+    public readonly structName
+    public readonly visibility
+    public readonly extender
+
+    constructor(settings: Partial<CPPClass>) {
+        Object.assign(this,settings);
+    }
+}
+
 let changed, configChanged;
 const Config = {
     structs: [],
     enums: [],
     charonDirectory: '',
     ghidraFile: '',
+    compressFile: true,
 };
 
 const warningString = '\r\n\r\n\r\n\r\n\r\n\r\n\r\n//This file is generated, do not edit by hand\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n';
@@ -114,6 +128,7 @@ class WeakMapExt<K extends object, V> extends WeakMap<K, V> {
 }
 
 const methodMap = new WeakMapExt<Struct, Method[]>(() => []);
+const extendedClassMap = new WeakMapExt<Struct, CPPClass[]>(() => []);
 
 fs.watchFile(Config.ghidraFile, changed = () => {
     Object.keys(TypeMap).forEach(key => {
@@ -186,8 +201,15 @@ fs.watchFile(Config.ghidraFile, changed = () => {
 
                 case words[0] === 'struct': {
 
-                    let name = words[1];
+                    let name = words[1], preComment = '';
                     const currentStruct = Struct.factory(name);
+                    if (words.length > 3) {
+                        let tmp = words.slice(4);
+                        tmp.pop();
+                        if (tmp[tmp.length-1].endsWith('*')) tmp[tmp.length-1] = tmp[tmp.length-1].substr(0, -1);
+                        preComment = tmp.join(' ').trim();
+                    }
+                    currentStruct.preComment = preComment;
                     while (lines[lines.length - 1] !== '};') {
                         let fieldType, fieldName;
                         let line = lines.pop().trim(), comments;
@@ -205,7 +227,6 @@ fs.watchFile(Config.ghidraFile, changed = () => {
                                 const typedefName = ('callback_' + returnType + (++functionCallbackTicker) + structVarName).replace(/\W/g, '');
                                 const typedef = Typedef.factory(typedefName);
 
-                                //typedef void (* name)(D2QuestDataStrc* , D2QuestArgStrc* );
                                 typedef.type = ` ${returnType} (*${typedefName})(${args})`;
 
                                 args.split(',').forEach(arg => {
@@ -273,7 +294,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
 
 
     // compress the file
-    wantedType.forEach(struct => {
+    Config.compressFile && wantedType.forEach(struct => {
         if (!(struct instanceof Struct)) return;
         if (struct.fields.length < 10) return;
 
@@ -285,6 +306,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
         }
         struct.fields = struct.fields.reduce((acc, cur) => {
             let [type, name] = cur;
+
 
             if (name.startsWith('field_')) {
                 // If not running, we are now
@@ -298,7 +320,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
                         // too small set
                         acc.push(...running.items.splice(0, running.items.length));
                     } else {
-                        acc.push([type, '_' + (running.counter++) + '[' + running.items.length + ']', '// removed field_0xxx for space'])
+                        acc.push([running.type, '_' + (running.counter++) + '[' + running.items.length + ']', '// removed field_0xxx for space'])
                         running.items.splice(0, running.items.length);
                     }
                 }
@@ -315,30 +337,100 @@ fs.watchFile(Config.ghidraFile, changed = () => {
     const headerFile = [];
     const enums = [];
 
+    out:
     {
-        const userDefinedMethods = fs.readFileSync(Config.charonDirectory + '/framework/ghidra.extensions.cpp').toString();
-
-        const lines = userDefinedMethods.split('\r\n').reverse();
-        while (lines.length) {
-            let currentLine = lines.pop();
-
-            const isMethod = /^\s*?(\w*)\s*Ghidra\s*::\s*(\w*)\s*::\s*(\w*)\s*\((.*)\)/gm.exec(currentLine);
-            if (isMethod) {
-                let [, returnType, structure, method, args] = isMethod;
-
-                const struct = TypeMap[structure];
-                if (Struct.isSelfType(struct)) {
-                    methodMap.getDefault(struct).push(new Method({returnType, method, args}));
+        try {
+            // If file doesnt exists
+            if (!fs.existsSync(Config.charonDirectory + '/framework/ghidra.extensions.cpp')) {
+                // but charon directory does
+                if (fs.existsSync(Config.charonDirectory+'/framework')) {
+                    // write a dummy empty file
+                    fs.writeFileSync(Config.charonDirectory + '/framework/ghidra.extensions.cpp','');
+                } else {
+                  break out;
                 }
             }
+            const userDefinedMethods = fs.readFileSync(Config.charonDirectory + '/framework/ghidra.extensions.cpp').toString();
+
+            const lines = userDefinedMethods.split('\r\n').reverse();
+            let currentNamespace = '';
+            while (lines.length) {
+                let currentLine = lines.pop();
+
+                const isNamespace = /\s*?namespace\s*(\w*?)\s*\{/gm.exec(currentLine);
+                if (isNamespace) [,currentNamespace] = isNamespace;
+
+                const isMethod = currentNamespace !== 'Ghidra' ?
+                    /^\s*?(\w*\*?)\s*Ghidra\s*::\s*(\w*)\s*::\s*(\w*)\s*\((.*)\)/gm.exec(currentLine)
+                    : /^\s*?(\w*\*?)\s*(\w*)\s*::\s*(\w*)\s*\((.*)\)/gm.exec(currentLine);
+
+                if (isMethod) {
+                    let [, returnType, structure, method, args] = isMethod;
+
+                    const struct = TypeMap[structure];
+                    if (Struct.isSelfType(struct)) {
+                        methodMap.getDefault(struct).push(new Method({returnType, method, args}));
+                    }
+                }
+            }
+        } catch(e) {
+            // If file not present we simply dont load the files
+            console.warn(e.message, e.stack);
         }
     }
+
+    // Add user defined child classes
+    {
+        try {
+            const userDefinedClasses = fs.readFileSync(Config.charonDirectory + '/headers/ghidra/user.extensions.h').toString();
+
+            const lines = userDefinedClasses.split('\r\n').reverse();
+            let currentNamespace = '';
+            while (lines.length) {
+                let currentLine = lines.pop();
+
+                const isNamespace = /\s*?namespace\s*(\w*?)\s*\{/gm.exec(currentLine);
+                if (isNamespace) [, currentNamespace] = isNamespace;
+
+                const isStruct = currentNamespace !== 'Ghidra' ?
+                    /^\s*?(\w*\*?)\s*Ghidra\s*::\s*(\w*)\s*::\s*(\w*)\s*\((.*)\)/gm.exec(currentLine)
+                    : /^\s*?(struct|class)\s*(\w*)\s*:\s*(public|protected|private|)\s*(\w*)/gm.exec(currentLine);
+
+                if (isStruct) {
+                    const [, structVariant, structName, visibility, extender] = isStruct;
+                    const parent = TypeMap[extender];
+
+                    if (parent && parent instanceof Struct) {
+                        extendedClassMap.getDefault(parent).push(new CPPClass({structVariant, structName, visibility, extender,}))
+                    }
+
+                }
+            }
+        } catch(e) {
+            // If file not present we simply dont load the files
+            console.warn(e.message);
+        }
+
+
+    }
+
 
 // Add all structs
     wantedType.forEach(el => {
         if (el instanceof Struct || el instanceof Union) {
             const typeName = el instanceof Struct ? 'struct' : 'union';
             preHeader.push(typeName + ' ' + el.name + ';')
+
+            // Add comments of structs
+            if (typeof el.preComment === 'string' && el.preComment.length) headerFile.push('/* '+el.preComment+' */');
+
+            // If struct has user defined child classes
+            if (extendedClassMap.has(el)) {
+                extendedClassMap.get(el).forEach(cppclass => {
+                    preHeader.push(cppclass.structVariant+' '+cppclass.structName+'; //: '+cppclass.visibility+' '+cppclass.extender+';');
+                });
+            }
+
             headerFile.push(typeName + ' ' + el.name + '{\r\n\t' + el.fields.map(el => el.map((cur, i) => {
                 if (i === 0 && TypeMap[cur.replace('*', '')] instanceof Enum) {
                     return 'enum ' + cur;
@@ -368,16 +460,16 @@ fs.watchFile(Config.ghidraFile, changed = () => {
         'unsigned int pointer', // some how pointer isnt defined properly by ghidra
     ]
 
-    fs.writeFileSync(Config.charonDirectory + '/headers/ghidra.h', [warningString,
+    fs.writeFileSync(Config.charonDirectory + '/headers/ghidra/main.h', [warningString,
         '#pragma once',
-        '#include "./ghidra.enums.h"',
-        '#include "./ghidra.naked.h"',
+        '#include "./enums.h"',
+        '#include "./naked.h"',
         'namespace Ghidra {',
         'typedef ' + (shorthands.join(';\r\ntypedef ') + ';'),
         ...typedef, ...headerFile,
         '}; // ghidra namespace'].join('\r\n'));
 
-    fs.writeFileSync(Config.charonDirectory + '/headers/ghidra.naked.h', [
+    fs.writeFileSync(Config.charonDirectory + '/headers/ghidra/naked.h', [
         warningString,
         '#pragma once',
         'namespace Ghidra {',
@@ -385,7 +477,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
         '}; // ghidra namespace',
     ].join('\r\n'));
 
-    fs.writeFileSync(Config.charonDirectory + '/headers/ghidra.enums.h', ['#pragma once\r\nnamespace Ghidra {', ...enums, '};//ghidra namespace'].join('\r\n'));
+    fs.writeFileSync(Config.charonDirectory + '/headers/ghidra/enums.h', ['#pragma once\r\nnamespace Ghidra {', ...enums, '};//ghidra namespace'].join('\r\n'));
 
     console.timeEnd('process');
 });
@@ -396,13 +488,15 @@ fs.watchFile('./StructureConfig.json', configChanged = () => {
     const json = fs.readFileSync('./StructureConfig.json');
     try {
         let _tmp = JSON.parse(json.toString());
-        const oldGhidra = Config.ghidraFile;
+        const oldGhidra = Config.ghidraFile, oldCharonDir = Config.charonDirectory;
         Object.keys(_tmp).forEach(key => Config[key] = _tmp[key]);
         if (oldGhidra !== Config.ghidraFile) {
             fs.unwatchFile(Config.ghidraFile);
             fs.watchFile(Config.ghidraFile, changed);
-            fs.unwatchFile(Config.charonDirectory+'/framework/ghidra.extensions.cpp');
-            fs.watchFile(Config.charonDirectory+'/framework/ghidra.extensions.cpp', changed);
+        }
+        if (oldCharonDir !== Config.charonDirectory) {
+            fs.unwatchFile(Config.charonDirectory + '/framework/ghidra.extensions.cpp');
+            fs.watchFile(Config.charonDirectory + '/framework/ghidra.extensions.cpp', changed);
         }
         changed();
     } catch (e) {

@@ -13,5 +13,6 @@
     "eD2ClientAppMode"
   ],
   "ghidraFile": "c:\\users\\jaenster\\game.exe.h",
-  "charonDirectory": "c:\\code\\cpp\\Charon\\"
+  "charonDirectory": "c:\\code\\cpp\\Charon\\",
+  "compressFile": true
 }
