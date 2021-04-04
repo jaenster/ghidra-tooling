@@ -142,6 +142,12 @@ class WeakMapExt<K extends object, V> extends WeakMap<K, V> {
 const methodMap = new WeakMapExt<Struct, Method[]>(() => []);
 const extendedClassMap = new WeakMapExt<Struct, CPPClass[]>(() => []);
 
+function sanatizeFieldType(ft) {
+    if (ft.startsWith('enum ')) ft = ft.substr(5);
+    if (ft.startsWith('union ')) ft = ft.substr( 6);
+    return ft.trim();
+}
+
 fs.watchFile(Config.ghidraFile, changed = () => {
     Object.keys(TypeMap).forEach(key => {
         delete TypeMap[key];
@@ -190,9 +196,8 @@ fs.watchFile(Config.ghidraFile, changed = () => {
                         [line, comments] = line.split(' /*');
                         const tmp = line.startsWith('struct') ? line.split(' ').slice(1) : line.split(' ');
                         let fieldName = tmp[tmp.length - 1].substr(0, tmp.pop().length - 1);
-                        let fieldType = tmp.join(' ');
-
-                        union.depends.add(fieldType.replace('*', ''));
+                        let fieldType = sanatizeFieldType(tmp.join(' '));
+                        union.depends.add(fieldType);
                         union.fields.push([fieldType, fieldName, (comments ? ('/*' + comments) : '').replace('* /', '*/')]);
                     }
 
@@ -202,7 +207,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
 
                 case words[0] === 'typedef' && !['struct', 'union'].includes(words[1]): {
                     let name = words.pop().replace(';', '');
-                    let type = words.slice(1).join(' ');
+                    let type = sanatizeFieldType(words.slice(1).join(' '));
 
                     const def = Typedef.factory(name);
                     def.type = type;
@@ -223,7 +228,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
                     }
 
                     currentStruct.preComment = preComment;
-                    while (lines[lines.length - 1] !== '};') {
+                    while (lines[lines.length - 1] && lines[lines.length - 1] !== '};') {
                         let fieldType, fieldName;
                         let line = lines.pop().trim(), comments;
                         // deal with comments
@@ -244,7 +249,7 @@ fs.watchFile(Config.ghidraFile, changed = () => {
 
                                 args.split(',').forEach(arg => {
                                     let [type] = arg.trim().split(' ');
-                                    type = type.replace('*', '');
+                                    type = sanatizeFieldType(type);
                                     typedef.depends.add(type);
                                 })
                                 typedef.isFunc = true;
@@ -263,16 +268,23 @@ fs.watchFile(Config.ghidraFile, changed = () => {
                             fieldType = tmp.join(' ');
                         }
 
+                        fieldType = sanatizeFieldType(fieldType);
+
+                        let tmpArray;
                         // remove variadic ghidra struct size
                         if (fieldType.includes('[0]')) {
                             fieldType = fieldType.substr(0, fieldType.indexOf('[')).trim();
                             fieldName += '[1]';
                             comments = 'variable size*/';
+                        } else if ((tmpArray = fieldType.match(/\[\d*\]/))) {
+                            // append the array size to the name field
+                            fieldName += tmpArray[0];
+                            fieldType = fieldType.replace(/\[\d*\]/, '');
                         }
 
                         // external type
                         if (!internalTypes.has(fieldType)) {
-                            currentStruct.depends.add(fieldType.replace('*', ''));
+                            currentStruct.depends.add(fieldType.replace('*','').trim());
                         }
 
                         currentStruct.fields.push([fieldType, fieldName, !comments ? '' : '/*' + comments.replace('* /', '*/')]);

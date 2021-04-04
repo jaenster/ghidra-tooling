@@ -5,13 +5,18 @@
     "D2QServerStrc",
     "D2IniConfigStrc",
     "FORMS_PredefinedFormStrc",
-    "D2BoundingBoxStrc"
+    "D2BoundingBoxStrc",
+    "D2ItemUnknownServerSideStrc",
+    "D2UnderMouseStrc",
+    "D2DataTableTxtStrc",
+    "D2CoordStrc"
   ],
   "enums": [
     "eD2LevelId",
     "eD2GSGameType",
     "eD2GSConnectionType",
-    "eD2ClientAppMode"
+    "eD2ClientAppMode",
+    "eD2UnitStat"
   ],
   "overrideTypes": {
     "D2ClientStrc": {
