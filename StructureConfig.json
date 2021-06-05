@@ -9,7 +9,10 @@
     "D2ItemUnknownServerSideStrc",
     "D2UnderMouseStrc",
     "D2DataTableTxtStrc",
-    "D2CoordStrc"
+    "D2CoordStrc",
+    "D2BattleNetEventCallbackTable",
+    "D2SaveFileHeaderStrc",
+    "D2UnderMouseStrc"
   ],
   "enums": [
     "eD2LevelId",
