@@ -341,52 +341,55 @@ fs.watchFile(Config.ghidraFile, changed = () => {
 
 
     // compress the file
-    Config.compressFile && wantedType.forEach(struct => {
-        if (!(struct instanceof Struct)) return;
-        // if (struct.fields.length < 10) return;
+    if (Config.compressFile) {
+        console.log('Compressing file');
+        wantedType.forEach(struct => {
+            if (!(struct instanceof Struct)) return;
+            // if (struct.fields.length < 10) return;
 
-        const running = {
-            type: '',
-            name: '',
-            counter: 0,
-            items: [],
-        }
-        struct.fields = struct.fields.reduce((acc, cur, index, orgin) => {
-            let [type, name] = cur;
+            const running = {
+                type: '',
+                name: '',
+                counter: 0,
+                items: [],
+            }
+            struct.fields = struct.fields.reduce((acc, cur, index, orgin) => {
+                let [type, name] = cur;
 
-            const writeCurrent = () => {
-                if (!running.items.length) return
+                const writeCurrent = () => {
+                    if (!running.items.length) return
 
-                if (running.items.length < 2) {
-                    // too small set
-                    acc.push(...running.items.splice(0, running.items.length));
-                } else {
-                    acc.push([running.type, '_' + (running.counter++) + '[' + running.items.length + ']', '// compressed'])
-                    running.items.splice(0, running.items.length);
+                    if (running.items.length < 2) {
+                        // too small set
+                        acc.push(...running.items.splice(0, running.items.length));
+                    } else {
+                        acc.push([running.type, '_' + (running.counter++) + '[' + running.items.length + ']', '// compressed'])
+                        running.items.splice(0, running.items.length);
+                    }
+
+                }
+                const isLast = orgin.length - 1 === index;
+                const startsWith = name.match(/^field(\d*)?_0x([0-9a-f]*)/);
+
+                if (startsWith) {
+                    // If not running, we are now
+                    if (running.type !== type) writeCurrent();
+                    if (!running.items.length) running.type = type;
+                    running.items.push(cur);
                 }
 
-            }
-            const isLast = orgin.length - 1 === index;
-            const startsWith = name.startsWith('field_');
+                if (!startsWith || isLast) {
+                    writeCurrent();
+                }
 
-            if (startsWith) {
-                // If not running, we are now
-                if (running.type !== type) writeCurrent();
-                if (!running.items.length) running.type = type;
-                running.items.push(cur);
-            }
+                if (!startsWith) {
+                    acc.push(cur);// just normal line
+                }
 
-            if (!startsWith || isLast) {
-                writeCurrent();
-            }
-
-            if (!startsWith) {
-                acc.push(cur);// just normal line
-            }
-
-            return acc;
-        }, [])
-    });
+                return acc;
+            }, [])
+        });
+    }
 
     const preHeader = [];
     const typedef = [];

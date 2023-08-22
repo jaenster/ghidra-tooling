@@ -12,7 +12,9 @@
     "D2CoordStrc",
     "D2BattleNetEventCallbackTable",
     "D2SaveFileHeaderStrc",
-    "D2UnderMouseStrc"
+    "D2UnderMouseStrc",
+    "D2ItemsTxt",
+    "D2GfxDataStrc"
   ],
   "enums": [
     "eD2LevelId",
@@ -26,7 +28,7 @@
       "pPlayer": "D2UnitPlayer*"
     }
   },
-  "ghidraFile": "c:\\users\\jaenster\\game.exe.h",
+  "ghidraFile": "c:\\users\\micro\\game.exe.h",
   "charonDirectory": "c:\\code\\cpp\\Charon\\",
   "compressFile": true
 }
